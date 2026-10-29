@@ -1,0 +1,97 @@
+# Builds the API image (backend/Dockerfile), pushes it to GHCR and deploys it on the Google VM.
+# Same layout as the other khantmaung.com APIs: /srv/sawyun/compose.yml behind the shared Caddy.
+name: Deploy sawyun-api (Google VM)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-sawyun-api-google-vm.yml"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag (commit SHA) to deploy. Leave empty to build and deploy this commit."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-sawyun-api-google-vm
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/khant26/sawyun-api
+
+jobs:
+  test:
+    if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+  deploy:
+    needs: build
+    if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy on the server
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.CICD_SAWYUN_API_GOOGLE_VM_HOST }}
+          port: ${{ secrets.CICD_SAWYUN_API_GOOGLE_VM_PORT }}
+          username: ${{ secrets.CICD_SAWYUN_API_GOOGLE_VM_USER }}
+          key: ${{ secrets.CICD_SAWYUN_API_GOOGLE_VM_SSH_KEY }}
+          envs: IMAGE_TAG,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -e
+            cd /srv/sawyun
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            export IMAGE_TAG
+            docker compose pull api
+            docker compose up -d api
+            docker logout ghcr.io
+            echo "Deployed ghcr.io/khant26/sawyun-api:$IMAGE_TAG"
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 10 "https://api-shop.khantmaung.com/api/v1/health" > /dev/null; then echo "healthy"; exit 0; fi
+            sleep 10
+          done
+          echo "https://api-shop.khantmaung.com/api/v1/health did not answer"; exit 1
