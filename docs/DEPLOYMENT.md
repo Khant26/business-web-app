@@ -33,6 +33,36 @@ There is **one application image**. The root `Dockerfile` has three stages:
 
 Migrations are inside the binary and run automatically on start.
 
+## 1b. Split hosting: frontend on Vercel, API on the Google VM
+
+This is the setup used for the presentation (3–5 users).
+
+| Part | Where | How |
+|---|---|---|
+| Frontend | Vercel project with **Root Directory = `frontend`** (uses `frontend/vercel.json`) | Env var `VITE_API_ORIGIN=https://<api-subdomain>` |
+| API | Google VM, container from `backend/Dockerfile` (API only), behind the existing Caddy | Reuses the shared Postgres (own database + role) |
+
+Use two subdomains of the **same domain** (e.g. `shop.example.com` → Vercel CNAME and
+`api-shop.example.com` → VM A record) so the login cookie works with the default `COOKIE_SAMESITE=lax`.
+If the frontend stays on a `*.vercel.app` address instead, set `COOKIE_SAMESITE=none` (needs `COOKIE_SECURE=true`).
+
+API environment for this setup:
+
+```env
+APP_ENV=production
+DATABASE_URL=postgres://sawyun:<password>@<postgres-host>:5432/sawyun?sslmode=disable
+OTP_SECRET=<long random string>
+OTP_SHOW_CODE=true               # presentation: login code shown in a pop-up, no email needed
+ADMIN_EMAIL=<your email>
+COOKIE_SECURE=true
+TRUST_PROXY=true                 # behind Caddy
+CORS_ORIGIN=https://shop.example.com
+UPLOAD_DIR=/app/uploads          # mount a volume here
+```
+
+Run the seed once inside the container for demo data: `docker exec <container> ./sawyun-seed`.
+Turn `OTP_SHOW_CODE` off (and configure SMTP) before anyone outside the team uses the shop.
+
 ## 2. Build the image
 
 ```bash

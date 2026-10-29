@@ -37,8 +37,10 @@ export const useAuthStore = defineStore('auth', () => {
     return inflight
   }
 
-  async function requestOtp(email: string) {
-    await authApi.requestOtp(email.trim().toLowerCase())
+  /** Sends a sign-in code. Returns the code itself when the API is in demo mode, otherwise null. */
+  async function requestOtp(email: string): Promise<string | null> {
+    const r = await authApi.requestOtp(email.trim().toLowerCase())
+    return r?.demo_code ?? null
   }
 
   async function verifyOtp(email: string, code: string): Promise<User> {

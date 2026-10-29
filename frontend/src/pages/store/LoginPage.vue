@@ -3,9 +3,10 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
-import { ArrowLeft, Mail, ShieldCheck } from 'lucide-vue-next'
+import { ArrowLeft, KeyRound, Mail, ShieldCheck } from 'lucide-vue-next'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import OtpInput from '@/components/store/OtpInput.vue'
 import { useForm, msg } from '@/composables/useForm'
 import { useErrorMessage } from '@/composables/useErrorMessage'
@@ -36,6 +37,9 @@ const formError = ref('')
 const verifying = ref(false)
 const sending = ref(false)
 const otpRef = ref<InstanceType<typeof OtpInput> | null>(null)
+// Presentation mode (API OTP_SHOW_CODE=true): the code is shown in a pop-up instead of emailed.
+const demoCode = ref('')
+const demoOpen = ref(false)
 
 // Resend countdown
 const cooldown = ref(0)
@@ -64,8 +68,9 @@ async function sendCode(isResend = false) {
   }
   sending.value = true
   try {
-    await auth.requestOtp(email.value)
-    if (isResend) ui.info(t('auth.codeResent'))
+    demoCode.value = (await auth.requestOtp(email.value)) ?? ''
+    demoOpen.value = !!demoCode.value
+    if (isResend && !demoCode.value) ui.info(t('auth.codeResent'))
     step.value = 'code'
     code.value = ''
     codeError.value = ''
@@ -117,7 +122,14 @@ async function verify(value = code.value) {
   }
 }
 
+function useDemoCode() {
+  demoOpen.value = false
+  code.value = demoCode.value
+  verify(demoCode.value)
+}
+
 function changeEmail() {
+  demoCode.value = ''
   step.value = 'email'
   code.value = ''
   codeError.value = ''
@@ -158,7 +170,9 @@ function changeEmail() {
 
       <template v-else>
         <h1>{{ $t('auth.codeTitle') }}</h1>
-        <p class="muted">{{ $t('auth.codeSentTo', { email }) }}</p>
+        <p class="muted">
+          {{ demoCode ? $t('auth.demoSubtitle') : $t('auth.codeSentTo', { email }) }}
+        </p>
         <form novalidate class="stack" @submit.prevent="verify()">
           <OtpInput
             ref="otpRef"
@@ -180,14 +194,37 @@ function changeEmail() {
               <ArrowLeft :size="14" aria-hidden="true" />{{ $t('auth.changeEmail') }}
             </BaseButton>
           </div>
-          <p class="muted text-xs">{{ $t('auth.checkSpam') }}</p>
+          <BaseButton v-if="demoCode" variant="link" @click="demoOpen = true">
+            <KeyRound :size="14" aria-hidden="true" />{{ $t('auth.demoShowAgain') }}
+          </BaseButton>
+          <p v-else class="muted text-xs">{{ $t('auth.checkSpam') }}</p>
         </form>
       </template>
     </div>
+
+    <BaseModal v-model:open="demoOpen" :title="$t('auth.demoTitle')" size="sm">
+      <p class="muted">{{ $t('auth.demoText', { email }) }}</p>
+      <p class="demo-code" aria-live="polite">{{ demoCode }}</p>
+      <template #footer>
+        <BaseButton variant="secondary" @click="demoOpen = false">{{
+          $t('common.close')
+        }}</BaseButton>
+        <BaseButton @click="useDemoCode">{{ $t('auth.demoUse') }}</BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <style scoped>
+.demo-code {
+  margin: var(--sp-4) 0 0;
+  text-align: center;
+  font-size: 2.25rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-primary);
+}
 .login {
   display: grid;
   place-items: center;

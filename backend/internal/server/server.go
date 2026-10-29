@@ -163,8 +163,8 @@ func New(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, mailer aut
 	})
 	// Public uploads (never the private slips folder).
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", staticFiles(filepath.Join(cfg.UploadDir, "public"), "public, max-age=31536000, immutable")))
-	// SPA (production builds).
-	if !cfg.IsDev() || dirExists(cfg.WebDir) {
+	// SPA, when a built frontend is present (all-in-one image). API-only deployments skip it.
+	if dirExists(cfg.WebDir) {
 		mux.Handle("/", spa(cfg.WebDir))
 	}
 
@@ -174,8 +174,8 @@ func New(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, mailer aut
 		middleware.Logger,
 		middleware.SecurityHeaders(cfg.CookieSecure),
 	}
-	if cfg.IsDev() && cfg.CORSOrigin != "" {
-		mws = append(mws, middleware.CORS(cfg.CORSOrigin))
+	if len(cfg.CORSOrigins) > 0 {
+		mws = append(mws, middleware.CORS(cfg.CORSOrigins))
 	}
 	mws = append(mws, middleware.RateLimitIP(globalLimit), middleware.CSRF, authSvc.Middleware)
 	return middleware.Chain(mux, mws...)

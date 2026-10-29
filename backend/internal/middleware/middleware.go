@@ -108,11 +108,15 @@ func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 	}
 }
 
-// CORS allows credentialed requests from a single origin (development only).
-func CORS(origin string) func(http.Handler) http.Handler {
+// CORS allows credentialed requests from the listed origins (dev server, or a separately hosted frontend).
+func CORS(origins []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(origins))
+	for _, o := range origins {
+		allowed[o] = true
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if origin != "" && r.Header.Get("Origin") == origin {
+			if origin := r.Header.Get("Origin"); allowed[origin] {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
 				h.Set("Access-Control-Allow-Credentials", "true")

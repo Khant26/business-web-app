@@ -228,7 +228,12 @@
     "signedOut": "You have been signed out.",
     "sessionExpired": "Your session expired. Please sign in again.",
     "terms": "By continuing you agree to our terms and privacy policy.",
-    "checkSpam": "Didn't get it? Check your spam folder."
+    "checkSpam": "Didn't get it? Check your spam folder.",
+    "demoTitle": "Your sign-in code",
+    "demoText": "Demo mode: email is turned off, so here is the code for {email}.",
+    "demoUse": "Use this code",
+    "demoShowAgain": "Show my code again",
+    "demoSubtitle": "Demo mode: your code is shown in a pop-up instead of by email."
   },
   "notFound": {
     "title": "Page not found",

@@ -5,6 +5,7 @@ package config
 import (
 	"bufio"
 	"errors"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -33,7 +34,15 @@ type Config struct {
 	SMTPPassword string
 	SMTPFrom     string
 
-	CORSOrigin string
+	// CORSOrigins lists the browser origins allowed to call the API with cookies
+	// (CORS_ORIGIN, comma separated), e.g. the Vercel frontend.
+	CORSOrigins []string
+	// CookieSameSite is lax (default), strict or none. Use none only when the frontend
+	// and API are on different sites (e.g. *.vercel.app → api.example.com); it needs COOKIE_SECURE=true.
+	CookieSameSite http.SameSite
+	// OTPShowCode returns the sign-in code in the API response so the website can show it
+	// in a pop-up. For demos/presentations without email only — never for a real shop.
+	OTPShowCode bool
 
 	// TrustProxy makes the client IP come from the first X-Forwarded-For entry.
 	// Default false: only enable it when the API sits behind a reverse proxy
@@ -69,8 +78,20 @@ func Load() (*Config, error) {
 		SMTPUsername:      get("SMTP_USERNAME", ""),
 		SMTPPassword:      get("SMTP_PASSWORD", ""),
 		SMTPFrom:          get("SMTP_FROM", "Sawyun Ecommerce <no-reply@example.com>"),
-		CORSOrigin:        get("CORS_ORIGIN", ""),
+		CORSOrigins:       splitList(get("CORS_ORIGIN", "")),
+		OTPShowCode:       getBool("OTP_SHOW_CODE", false),
 		TrustProxy:        getBool("TRUST_PROXY", false),
+	}
+	switch strings.ToLower(get("COOKIE_SAMESITE", "lax")) {
+	case "none":
+		c.CookieSameSite = http.SameSiteNoneMode
+		if !c.CookieSecure {
+			return nil, errors.New("COOKIE_SAMESITE=none requires COOKIE_SECURE=true")
+		}
+	case "strict":
+		c.CookieSameSite = http.SameSiteStrictMode
+	default:
+		c.CookieSameSite = http.SameSiteLaxMode
 	}
 	if c.SessionMaxPerUser < 1 {
 		c.SessionMaxPerUser = 1
@@ -86,6 +107,16 @@ func get(k, def string) string {
 		return strings.TrimSpace(v)
 	}
 	return def
+}
+
+func splitList(v string) []string {
+	var out []string
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimRight(strings.TrimSpace(p), "/"); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func getInt(k string, def int) int {

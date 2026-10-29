@@ -128,7 +128,7 @@ type Review = { id: number; rating: number; comment: string; user_name: string; 
 
 | Method | Path | Body → Response |
 |---|---|---|
-| POST | `/auth/otp/request` | `{email}` → `204`. Always 204 for valid email format (no account enumeration). Creates a 6-digit code (5 min TTL), emails it. The code is emailed when `SMTP_HOST` is set; in development it is also written to the API log (see Implementation notes). |
+| POST | `/auth/otp/request` | `{email}` → `204` (or `200 {demo_code}` when the API runs with `OTP_SHOW_CODE=true`, presentation mode without email). Always 204 for valid email format (no account enumeration). Creates a 6-digit code (5 min TTL), emails it. The code is emailed when `SMTP_HOST` is set; in development it is also written to the API log (see Implementation notes). |
 | POST | `/auth/otp/verify` | `{email, code}` → `{user: User}` + sets `sy_session`. Creates the user (role customer) if new. Errors: `otp_invalid`, `otp_expired`, `otp_too_many_attempts` (after 5 wrong codes the code is burned), `account_disabled`. |
 | POST | `/auth/logout` | → `204` |
 | GET | `/auth/me` | → `{user: User}` or `401` |

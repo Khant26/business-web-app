@@ -1,4 +1,4 @@
-import { api, seg } from '../client'
+import { api, API_BASE, seg } from '../client'
 import type {
   AdminEvent,
   AdminOrder,
@@ -67,7 +67,7 @@ export const adminApi = {
     api.post<AdminOrder>(`/admin/slips/${id}/approve`, { note }),
   rejectSlip: (id: number, note: string) =>
     api.post<AdminOrder>(`/admin/slips/${id}/reject`, { note }),
-  slipFileUrl: (id: number) => `/api/v1/admin/slips/${id}/file`,
+  slipFileUrl: (id: number) => `${API_BASE}/admin/slips/${id}/file`,
 
   // Products
   products: (q: AdminProductQuery = {}) =>

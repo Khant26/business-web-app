@@ -1,6 +1,31 @@
 import type { ApiErrorBody } from '@/types/api'
 
-export const API_BASE = '/api/v1'
+/**
+ * Where the API lives. Empty (default) = same origin, which is what the Vite dev proxy and the
+ * all-in-one Docker image use. Set VITE_API_ORIGIN (e.g. https://api-shop.example.com) when the
+ * frontend is hosted separately, e.g. on Vercel.
+ */
+export const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, '')
+export const API_BASE = `${API_ORIGIN}/api/v1`
+
+const ASSET_KEYS = new Set(['url', 'image_url', 'banner_url', 'first_item_image'])
+
+/** Rewrites uploaded-file paths in API responses (in place) so <img> tags load them from the API. */
+function absolutizeAssets(value: unknown): void {
+  if (!API_ORIGIN || typeof value !== 'object' || value === null) return
+  if (Array.isArray(value)) {
+    value.forEach(absolutizeAssets)
+    return
+  }
+  const obj = value as Record<string, unknown>
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'string') {
+      if (ASSET_KEYS.has(k) && v.startsWith('/uploads/')) obj[k] = API_ORIGIN + v
+    } else {
+      absolutizeAssets(v)
+    }
+  }
+}
 export const CSRF_HEADER = 'X-Requested-With'
 export const CSRF_VALUE = 'sawyun'
 
@@ -157,6 +182,7 @@ export async function request<T>(
     throw err
   }
 
+  absolutizeAssets(data)
   return data as T
 }
 

@@ -74,3 +74,29 @@ func TestSecurityHeaders(t *testing.T) {
 		}
 	}
 }
+
+func TestCORSAllowsListedOrigins(t *testing.T) {
+	h := CORS([]string{"https://shop.example.com", "https://preview.vercel.app"})(ok)
+	for origin, want := range map[string]string{
+		"https://shop.example.com":   "https://shop.example.com",
+		"https://preview.vercel.app": "https://preview.vercel.app",
+		"https://evil.example.com":   "",
+	} {
+		r := httptest.NewRequest("GET", "/api/v1/home", nil)
+		r.Header.Set("Origin", origin)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != want {
+			t.Errorf("origin %s: allow-origin = %q, want %q", origin, got, want)
+		}
+	}
+
+	r := httptest.NewRequest("OPTIONS", "/api/v1/orders", nil)
+	r.Header.Set("Origin", "https://shop.example.com")
+	r.Header.Set("Access-Control-Request-Method", "POST")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Credentials") != "true" {
+		t.Errorf("preflight: code %d, credentials %q", w.Code, w.Header().Get("Access-Control-Allow-Credentials"))
+	}
+}

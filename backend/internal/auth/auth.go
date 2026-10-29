@@ -161,6 +161,10 @@ func (s *Service) RequestOTP(w http.ResponseWriter, r *http.Request) error {
 		slog.Error("send OTP email failed", "to", email, "err", err)
 		return httpx.E(http.StatusInternalServerError, "internal", "Could not send the email, please try again")
 	}
+	if s.Cfg.OTPShowCode {
+		// Demo mode: the website shows the code in a pop-up instead of the user reading email.
+		return httpx.OK(w, map[string]string{"demo_code": code})
+	}
 	return httpx.NoContent(w)
 }
 
@@ -281,14 +285,14 @@ func (s *Service) createSession(ctx context.Context, w http.ResponseWriter, r *h
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: CookieName, Value: token, Path: "/", HttpOnly: true, Secure: s.Cfg.CookieSecure,
-		SameSite: http.SameSiteLaxMode, MaxAge: int(s.Cfg.SessionTTL.Seconds()),
+		SameSite: s.Cfg.CookieSameSite, MaxAge: int(s.Cfg.SessionTTL.Seconds()),
 	})
 	return nil
 }
 
 func (s *Service) clearCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: "", Path: "/", HttpOnly: true,
-		Secure: s.Cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+		Secure: s.Cfg.CookieSecure, SameSite: s.Cfg.CookieSameSite, MaxAge: -1})
 }
 
 // Logout handles POST /auth/logout.
