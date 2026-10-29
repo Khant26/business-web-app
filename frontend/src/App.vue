@@ -1,33 +1,44 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
-import { Search, ShoppingBag, UserRound, ArrowRight, Star, X, Minus, Plus, Heart, SlidersHorizontal, Check, ShieldCheck, Truck, PackageCheck, LayoutDashboard } from 'lucide-vue-next'
-import AdminPanel from './components/AdminPanel.vue'
-import { seedProducts } from './data'
-import type { CartLine, Product } from './types'
-const fetchProducts=async():Promise<Product[]>=>{try{const r=await fetch('/api/products');if(!r.ok)throw new Error();return await r.json()}catch{return seedProducts}}
-const {data:products,isLoading}=useQuery({queryKey:['products'],queryFn:fetchProducts,initialData:seedProducts})
-const query=ref(''),category=ref('All'),sort=ref('Featured'),cartOpen=ref(false),checkoutOpen=ref(false),orderDone=ref(false),orderError=ref(''),adminOpen=ref(false),searchInput=ref<HTMLInputElement>()
-const cart=ref<CartLine[]>(JSON.parse(localStorage.getItem('northstar-cart')||'[]')),wishes=ref<number[]>([])
-const categories=computed(()=>['All',...new Set(products.value.map(p=>p.category))])
-const filtered=computed(()=>{const rows=products.value.filter(p=>(category.value==='All'||p.category===category.value)&&(`${p.name} ${p.category}`.toLowerCase().includes(query.value.toLowerCase())));return [...rows].sort((a,b)=>sort.value==='Price: low'?a.price-b.price:sort.value==='Price: high'?b.price-a.price:sort.value==='Rating'?b.rating-a.rating:Number(b.featured)-Number(a.featured))})
-const itemCount=computed(()=>cart.value.reduce((n,l)=>n+l.quantity,0)),subtotal=computed(()=>cart.value.reduce((n,l)=>n+l.price*l.quantity,0)),shipping=computed(()=>subtotal.value>=75||!subtotal.value?0:8),total=computed(()=>subtotal.value+shipping.value)
-watch(cart,v=>localStorage.setItem('northstar-cart',JSON.stringify(v)),{deep:true});onMounted(()=>{wishes.value=JSON.parse(localStorage.getItem('northstar-wishes')||'[]')})
-const money=(n:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n)
-function add(p:Product){const found=cart.value.find(l=>l.id===p.id);if(found)found.quantity++;else cart.value.push({...p,quantity:1});cartOpen.value=true}
-function qty(id:number,delta:number){const line=cart.value.find(x=>x.id===id);if(!line)return;line.quantity+=delta;if(line.quantity<=0)cart.value=cart.value.filter(x=>x.id!==id)}
-function wish(id:number){wishes.value=wishes.value.includes(id)?wishes.value.filter(x=>x!==id):[...wishes.value,id];localStorage.setItem('northstar-wishes',JSON.stringify(wishes.value))}
-async function placeOrder(event:Event){orderError.value='';const form=event.target as HTMLFormElement;const fields=Object.fromEntries(new FormData(form));try{const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fields.email,customer_name:`${fields.first_name} ${fields.last_name}`,shipping_address:`${fields.address}, ${fields.city} ${fields.postal_code}`,items:cart.value.map(l=>({product_id:l.id,quantity:l.quantity}))})});if(!response.ok)throw new Error('The order could not be accepted.');orderDone.value=true;cart.value=[]}catch{orderError.value='Checkout is temporarily unavailable. Please make sure the Go service is running and try again.'}}
+import { onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import ToastHost from '@/components/ui/ToastHost.vue'
+import { onUnauthorized } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+import { useWishlistStore } from '@/stores/wishlist'
+import { useSettingsStore } from '@/stores/settings'
+import { useUiStore } from '@/stores/ui'
+
+const router = useRouter()
+const { t } = useI18n()
+const auth = useAuthStore()
+const wishlist = useWishlistStore()
+const ui = useUiStore()
+void useSettingsStore().load()
+
+// Session ended server-side (expired/revoked): clear local user and send to login if needed.
+const off = onUnauthorized(() => {
+  const wasLoggedIn = auth.isLoggedIn
+  auth.clear()
+  const route = router.currentRoute.value
+  if (route.matched.some((r) => r.meta.requiresAuth)) {
+    if (wasLoggedIn) ui.warning(t('auth.sessionExpired'))
+    void router.replace({ name: 'login', query: { redirect: route.fullPath } })
+  }
+})
+onBeforeUnmount(off)
+
+watch(
+  () => auth.user?.id,
+  (id) => {
+    if (id) void wishlist.load()
+    else wishlist.reset()
+  },
+  { immediate: true },
+)
 </script>
-<template><div class="app-shell">
- <div class="announcement">Free delivery over $75 · 30-day returns</div>
- <header><a class="brand" href="#top">NORTHSTAR<span>.</span></a><nav aria-label="Primary navigation"><a href="#new">New in</a><a href="#shop">Shop</a><a href="#story">Our story</a></nav><div class="header-actions"><button aria-label="Search" @click="searchInput?.focus()"><Search :size="20"/></button><button aria-label="Account"><UserRound :size="20"/></button><button aria-label="Admin dashboard" @click="adminOpen=true"><LayoutDashboard :size="20"/></button><button class="bag" aria-label="Shopping bag" @click="cartOpen=true"><ShoppingBag :size="20"/><span>{{itemCount}}</span></button></div></header>
- <main id="top"><section class="hero"><div class="hero-copy"><p class="eyebrow">Edition 04 — Everyday form</p><h1>Less, but<br/><em>considered.</em></h1><p class="lede">Objects for daily life, selected for quiet utility, honest materials, and enduring form.</p><a class="primary-cta" href="#shop">Explore the collection <ArrowRight :size="18"/></a><div class="proof"><span><Star :size="15" fill="currentColor"/> 4.9 average rating</span><span>Responsibly sourced</span></div></div><div class="hero-visual" role="img" aria-label="A curated carryall, watch, bottle and lamp in a warm studio setting"><span class="visual-caption">Edition 04 · Designed to belong</span></div></section>
- <section id="shop" class="collection"><div class="section-heading"><div><p class="eyebrow">The collection</p><h2>Made for the everyday</h2></div><span>{{filtered.length}} objects</span></div><div class="catalog-tools"><label class="search-box"><Search :size="18"/><input ref="searchInput" v-model="query" placeholder="Search the collection" aria-label="Search products"/><button v-if="query" @click="query=''" aria-label="Clear search"><X :size="16"/></button></label><div class="category-pills"><button v-for="c in categories" :key="c" :class="{active:category===c}" @click="category=c">{{c}}</button></div><label class="sort"><SlidersHorizontal :size="16"/><select v-model="sort" aria-label="Sort products"><option>Featured</option><option>Price: low</option><option>Price: high</option><option>Rating</option></select></label></div><p v-if="isLoading">Loading collection…</p><div v-else-if="filtered.length" class="product-grid"><article v-for="(product,index) in filtered" :key="product.id" class="product-card"><div class="product-image" :style="{background:product.color}"><span>0{{index+1}}</span><button class="wish" :class="{saved:wishes.includes(product.id)}" @click="wish(product.id)" :aria-label="`Save ${product.name}`"><Heart :size="17" :fill="wishes.includes(product.id)?'currentColor':'none'"/></button><div class="product-form" :style="{background:product.accent}"></div><button class="quick-add" @click="add(product)">Quick add <Plus :size="16"/></button></div><div class="product-info"><div><p>{{product.category}}</p><h3>{{product.name}}</h3><span><Star :size="12" fill="currentColor"/> {{product.rating}} ({{product.reviews}})</span></div><strong>{{money(product.price)}}</strong></div></article></div><div v-else class="empty-state"><Search :size="28"/><h3>No objects found</h3><p>Try a broader search or another category.</p><button @click="query='';category='All'">Reset filters</button></div></section>
- <section id="story" class="story"><div><p class="eyebrow">Our standard</p><h2>Useful objects.<br/><em>Better choices.</em></h2></div><div class="principles"><article><PackageCheck/><h3>Chosen to last</h3><p>We select durable construction and materials that age with character.</p></article><article><Truck/><h3>Lower-impact delivery</h3><p>Plastic-free packing and consolidated carbon-aware shipping as standard.</p></article><article><ShieldCheck/><h3>Buy with confidence</h3><p>Clear warranties, honest details, and a straightforward 30-day return.</p></article></div></section>
- <section class="newsletter"><p class="eyebrow">Notes from Northstar</p><h2>New objects, fewer emails.</h2><form @submit.prevent="($event.target as HTMLFormElement).reset()"><input type="email" required placeholder="Email address" aria-label="Email address"/><button>Join the list <ArrowRight :size="17"/></button></form></section></main>
- <footer><a class="brand" href="#top">NORTHSTAR<span>.</span></a><p>Quiet utility for everyday life.</p><div><a href="#shop">Shop</a><a href="#story">About</a><a href="mailto:hello@northstar.store">Contact</a></div><small>© 2026 Northstar Goods</small></footer>
- <Transition name="fade"><div v-if="cartOpen" class="drawer-backdrop" @click="cartOpen=false"></div></Transition><Transition name="slide"><aside v-if="cartOpen" class="cart-drawer" aria-label="Shopping bag"><div class="drawer-head"><div><p class="eyebrow">Your selection</p><h2>Shopping bag <span>({{itemCount}})</span></h2></div><button @click="cartOpen=false" aria-label="Close cart"><X/></button></div><div v-if="cart.length" class="cart-lines"><article v-for="line in cart" :key="line.id"><div class="cart-thumb" :style="{background:line.color}"><span :style="{background:line.accent}"></span></div><div><p>{{line.category}}</p><h3>{{line.name}}</h3><strong>{{money(line.price)}}</strong><div class="qty"><button @click="qty(line.id,-1)"><Minus :size="14"/></button><span>{{line.quantity}}</span><button @click="qty(line.id,1)"><Plus :size="14"/></button></div></div><button class="remove" @click="cart=cart.filter(x=>x.id!==line.id)">Remove</button></article></div><div v-else class="cart-empty"><ShoppingBag :size="32"/><h3>Your bag is ready for good things.</h3><p>Explore objects designed to earn their place.</p><button @click="cartOpen=false">Continue shopping</button></div><div v-if="cart.length" class="cart-summary"><div><span>Subtotal</span><strong>{{money(subtotal)}}</strong></div><div><span>Shipping</span><strong>{{shipping?money(shipping):'Free'}}</strong></div><div class="grand"><span>Total</span><strong>{{money(total)}}</strong></div><button @click="cartOpen=false;checkoutOpen=true">Secure checkout <ArrowRight :size="18"/></button><p><ShieldCheck :size="14"/> Secure demo checkout · no payment is charged</p></div></aside></Transition>
- <div v-if="checkoutOpen" class="modal-backdrop"><section class="checkout-modal"><button class="modal-close" @click="checkoutOpen=false;orderDone=false;orderError='' "><X/></button><template v-if="!orderDone"><p class="eyebrow">Checkout</p><h2>Complete your order</h2><form @submit.prevent="placeOrder"><div class="field-row"><label>First name<input name="first_name" required autocomplete="given-name"/></label><label>Last name<input name="last_name" required autocomplete="family-name"/></label></div><label>Email<input name="email" required type="email" autocomplete="email"/></label><label>Address<input name="address" required autocomplete="street-address"/></label><div class="field-row"><label>City<input name="city" required/></label><label>Postal code<input name="postal_code" required/></label></div><p v-if="orderError" class="form-error">{{orderError}}</p><div class="checkout-total"><span>Total today</span><strong>{{money(total)}}</strong></div><button class="place-order">Place demo order <ArrowRight :size="18"/></button></form></template><div v-else class="success"><span><Check :size="34"/></span><p class="eyebrow">Order confirmed</p><h2>Thank you.</h2><p>Your demo order has been placed. A confirmation would be sent to your email.</p><button @click="checkoutOpen=false;orderDone=false">Back to the shop</button></div></section></div>
- <AdminPanel v-if="adminOpen" :products="products" @close="adminOpen=false"/>
-</div></template>
+
+<template>
+  <RouterView />
+  <ToastHost />
+</template>

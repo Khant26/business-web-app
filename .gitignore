@@ -1,6 +1,22 @@
-frontend/node_modules/
-frontend/dist/
-frontend/.cache/
-backend/data/*.json
+# Dependencies & builds
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+backend/bin/
+*.exe
+
+# Runtime data
+uploads/
+backend/uploads/
+
+# Env & logs
 .env
 *.log
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

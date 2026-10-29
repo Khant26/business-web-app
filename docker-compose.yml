@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: sawyun
+      POSTGRES_PASSWORD: sawyun
+      POSTGRES_DB: sawyun
+    ports:
+      - "5433:5432"   # host 5433: avoids clashing with a locally installed PostgreSQL
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sawyun"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    profiles: ["app"]
+    env_file: .env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgres://sawyun:sawyun@db:5432/sawyun?sslmode=disable
+      WEB_DIR: /app/web
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  uploads:

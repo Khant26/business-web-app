@@ -1,9 +1,0 @@
-<script setup lang="ts">
-import { h } from 'vue'
-import { FlexRender, getCoreRowModel, useVueTable, createColumnHelper } from '@tanstack/vue-table'
-import type { Product } from '../types'
-const props=defineProps<{products:Product[]}>(); const emit=defineEmits<{close:[]}>(); const helper=createColumnHelper<Product>()
-const columns=[helper.accessor('name',{header:'Product'}),helper.accessor('category',{header:'Category'}),helper.accessor('price',{header:'Price',cell:i=>`$${i.getValue()}`}),helper.accessor('stock',{header:'Stock',cell:i=>h('span',{class:i.getValue()<10?'stock-low':''},i.getValue())}),helper.accessor('rating',{header:'Rating'})]
-const table=useVueTable({get data(){return props.products},columns,getCoreRowModel:getCoreRowModel()})
-</script>
-<template><div class="modal-backdrop" @click.self="emit('close')"><section class="admin-modal"><div class="modal-head"><div><p class="eyebrow">TanStack Table</p><h2>Inventory overview</h2></div><button @click="emit('close')">Close</button></div><div class="stat-row"><div><strong>{{products.length}}</strong><span>Products</span></div><div><strong>{{products.reduce((n,p)=>n+p.stock,0)}}</strong><span>Units in stock</span></div><div><strong>{{products.filter(p=>p.stock<10).length}}</strong><span>Low stock</span></div></div><div class="table-wrap"><table><thead v-for="group in table.getHeaderGroups()" :key="group.id"><tr><th v-for="header in group.headers" :key="header.id"><FlexRender :render="header.column.columnDef.header" :props="header.getContext()" /></th></tr></thead><tbody><tr v-for="row in table.getRowModel().rows" :key="row.id"><td v-for="cell in row.getVisibleCells()" :key="cell.id"><FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" /></td></tr></tbody></table></div></section></div></template>

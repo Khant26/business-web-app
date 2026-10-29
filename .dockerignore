@@ -1,0 +1,10 @@
+.git
+**/node_modules
+frontend/dist
+frontend/.cache
+backend/bin
+backend/uploads
+uploads
+.env
+**/*.log
+**/*.exe

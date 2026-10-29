@@ -1,0 +1,113 @@
+/* Shared admin-area styles (imported once by AdminLayout). */
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+.admin-toolbar > .grow {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.admin-toolbar > .fixed {
+  flex: 0 1 180px;
+  min-width: 140px;
+}
+@media (max-width: 559px) {
+  .admin-toolbar > .fixed {
+    flex: 1 1 140px;
+  }
+}
+.admin-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.admin-search svg {
+  position: absolute;
+  left: 12px;
+  color: var(--c-muted);
+  pointer-events: none;
+}
+.admin-search input {
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--sp-3) 0 38px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  font-size: 16px;
+}
+@media (min-width: 768px) {
+  .admin-search input {
+    font-size: var(--fs-sm);
+  }
+}
+.admin-search input:focus {
+  outline: none;
+  border-color: var(--c-primary-600);
+  box-shadow: var(--ring);
+}
+.admin-cols {
+  display: grid;
+  gap: var(--sp-5);
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .admin-cols {
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  }
+}
+.admin-section-title {
+  font-size: var(--fs-md);
+  margin: 0 0 var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.admin-thumb-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  text-align: left;
+}
+.admin-thumb-cell .thumb {
+  width: 40px;
+  flex: none;
+}
+.admin-thumb-cell .txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.admin-thumb-cell .txt .sub {
+  font-size: var(--fs-xs);
+  color: var(--c-muted);
+}
+.admin-row-actions {
+  display: inline-flex;
+  gap: var(--sp-1);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.admin-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+.admin-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.admin-dl dt {
+  color: var(--c-muted);
+}
+.admin-dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
